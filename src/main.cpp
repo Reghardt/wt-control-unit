@@ -3,6 +3,7 @@
 #include <Keypad.h>
 
 #define RS_MODE_PIN 7
+#define RELAY_PIN 4
 #define LCD_WIDTH 16
 #define LCD_HEIGHT 2
 #define ROWS 5
@@ -18,6 +19,7 @@ void waterDepthScreen(char key);
 String getValueOfKey(String key, String message, String expectType);
 String receiveMessage(char ch);
 void updateLCD(String line1, String line2);
+void setPumpOnOrOff(boolean isOn);
 
 int screenIndex = 0;
 int waterLevel = 0;
@@ -57,6 +59,9 @@ void setup() {
   pinMode(RS_MODE_PIN, OUTPUT);
   digitalWrite(RS_MODE_PIN, LOW); // if low, is receiver
 
+  pinMode(RELAY_PIN, OUTPUT);
+  setPumpOnOrOff(false);
+
   Serial.begin(9600);
 
   screens[screenIndex]('z');
@@ -71,18 +76,18 @@ void loop() {
   {
     if(waterLevel >= stopFillWhen && pumpOn == true)
     {
-      pumpOn = false;
+      setPumpOnOrOff(false);
     }
     else if(waterLevel <= refillWhen && pumpOn == false)
     {
-      pumpOn = true;
+      setPumpOnOrOff(true);
     }
   }
   else if(controlStateIndex == 2) // FILL & AUTO
   {
     if(waterLevel >= stopFillWhen && pumpOn == true)
     {
-      pumpOn = false; //pump off when done
+      setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 1; //SYS AUTO when done
       local_controlStateIndex = 1;
     }
@@ -91,7 +96,7 @@ void loop() {
   {
     if(waterLevel >= stopFillWhen && pumpOn == true)
     {
-      pumpOn = false; //pump off when done
+      setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 0; //SYS OFF when done
       local_controlStateIndex = 0;
     }
@@ -181,15 +186,15 @@ void controlScreen(char key){
     controlStateIndex = local_controlStateIndex;
     if(controlStateIndex == 0) //OFF
     {
-      pumpOn = false;
+      setPumpOnOrOff(false);
     } 
     else if(controlStateIndex == 1 && waterLevel <= refillWhen) //AUTO
     {
-      pumpOn = true;
+      setPumpOnOrOff(true);
     } 
     else if((controlStateIndex == 2 || controlStateIndex == 3) && waterLevel < stopFillWhen)
     {
-      pumpOn = true;
+      setPumpOnOrOff(true);
     }
   }
 
@@ -336,7 +341,6 @@ void waterDepthScreen(char key)
     waterDepth = local_waterDepth;
   }
 
-
   String line2 = "";
   if(local_waterDepth != waterDepth)
   {
@@ -354,7 +358,6 @@ String receiveMessage(char ch)
 {
   static int hashes = 0;
   static int dollars = 0;
-  static int currentLength = 0;
   static String message = "";
 
   if(!(ch == 10 || ch == 13))
@@ -367,7 +370,6 @@ String receiveMessage(char ch)
         Serial.println("ERR 1"); //more than 3 hashes encountered
         hashes = 0;
         dollars = 0;
-        currentLength = 0;
         message = "";
       }   
     }
@@ -380,11 +382,9 @@ String receiveMessage(char ch)
           dollars++;
           if(dollars == 3)
           {
-            //Serial.println("MESSAGE: " + message);
             const String tempMessage = message;
             hashes = 0;
             dollars = 0;
-            currentLength = 0;
             message = "";
             return tempMessage;
           }
@@ -393,7 +393,15 @@ String receiveMessage(char ch)
         {
           if((ch < 59 && ch > 47) || (ch < 91 && ch > 64) || ch == 46 || ch == 33)
           {
-            message += ch;
+            if(message.length() < 50)
+            {
+              message += ch;
+            }
+            else
+            {
+              message = "";
+              return "";
+            }
           }
           else
           {
@@ -401,7 +409,6 @@ String receiveMessage(char ch)
             Serial.println("ERR un ex body ch: " + String(charCode)); //unexpected character: 
             hashes = 0;
             dollars = 0;
-            currentLength = 0;
             message = "";
           }
         }
@@ -412,7 +419,6 @@ String receiveMessage(char ch)
         Serial.println("ERR un ex start ch: " + String(charCode)); //unexpected start char: 
         hashes = 0;
         dollars = 0;
-        currentLength = 0;
         message = "";
       }
     }
@@ -423,8 +429,6 @@ String receiveMessage(char ch)
 
 String getValueOfKey(String key, String message, String expectType)
 {
-  //TODO expects Type
-
   unsigned int index = message.indexOf(key + ':');
   String value = "";
 
@@ -436,7 +440,6 @@ String getValueOfKey(String key, String message, String expectType)
       auto ch = message[index];
       if(expectType == "num")
       {
-        
         if(ch > 47 && ch < 58)
         {
           value += ch;
@@ -485,3 +488,15 @@ void updateLCD(String line1, String line2)
   lcd.print(line2 + padding);      
 }
 
+void setPumpOnOrOff(boolean isOn){
+  if(isOn)
+  {
+    digitalWrite(RELAY_PIN, HIGH);
+    pumpOn = isOn;
+  }
+  else
+  {
+    digitalWrite(RELAY_PIN, LOW);
+    pumpOn = isOn;
+  }
+}
