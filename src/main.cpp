@@ -5,8 +5,10 @@
 #define RS_MODE_PIN 7
 #define LCD_WIDTH 16
 #define LCD_HEIGHT 2
+#define ROWS 5
+#define COLS 1
 
-// put function declarations here:
+//function declerations
 void controlScreen(char key);
 void stopFillWhenScreen(char key);
 void refillWhenScreen(char key);
@@ -14,56 +16,44 @@ void sensorHeightScreen(char key);
 void waterDepthScreen(char key);
 
 String getValueOfKey(String key, String message, String expectType);
-
 String receiveMessage(char ch);
-
-LiquidCrystal_I2C lcd(0x27, LCD_WIDTH, LCD_HEIGHT);
-String padding = "";
-
 void updateLCD(String line1, String line2);
 
-// //Keypad/////////////////////////////////////////////////////////////////
-const byte ROWS = 5; 
-const byte COLS = 1; 
-
-char hexaKeys[ROWS][COLS] = {
-  {'N'}, {'B'}, {'I'}, {'D'}, {'S'}
-};
-
-//byte rowPins[ROWS] = {7, 6, 5, 4, 3}; 
-byte rowPins[ROWS] = {A0, A1, A2, A3, 6};
-byte colPins[COLS] = {5}; 
-
-Keypad kpd = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
-// ////////////////////////////////////////////////////////////////////////
-
-typedef void (*Screens)(char key);
 int screenIndex = 0;
 int waterLevel = 0;
-
 bool pumpOn = false;
 String controlStates[] = {"OFF", "AUTO", "FILL & AUTO", "FILL & OFF"};
 int controlStateIndex = 0; // 0 = OFF, 1 = AUTO, 2 = FILL & AUTO, 3 = FILL & OFF 
+int local_controlStateIndex = controlStateIndex;
 int stopFillWhen = 80;
 int refillWhen = 20;
 int sensorHeight = 20;
 int waterDepth = 200;
+String padding = "";
 
+// //Keypad/////////////////////////////////////////////////////////////////
+char hexaKeys[ROWS][COLS] = {{'N'}, {'B'}, {'I'}, {'D'}, {'S'}};
+byte rowPins[ROWS] = {A0, A1, A2, A3, 6};
+byte colPins[COLS] = {5}; 
+Keypad kpd = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
+// ////////////////////////////////////////////////////////////////////////
+
+typedef void (*Screens)(char key);
 Screens screens[] = {
   controlScreen, stopFillWhenScreen, refillWhenScreen, sensorHeightScreen, waterDepthScreen
 };
+
+LiquidCrystal_I2C lcd(0x27, LCD_WIDTH, LCD_HEIGHT);
 
 void setup() {
   lcd.init();
   lcd.clear();
   lcd.backlight();
 
-  for(int j = 0; j < LCD_WIDTH; j++)
-  {
+  for(int j = 0; j < LCD_WIDTH; j++){
     padding += ' ';
   }
   
-
   pinMode(RS_MODE_PIN, OUTPUT);
   digitalWrite(RS_MODE_PIN, LOW); // if low, is receiver
 
@@ -94,6 +84,7 @@ void loop() {
     {
       pumpOn = false; //pump off when done
       controlStateIndex = 1; //SYS AUTO when done
+      local_controlStateIndex = 1;
     }
   }
   else if(controlStateIndex == 3) // FILL & OFF
@@ -102,6 +93,7 @@ void loop() {
     {
       pumpOn = false; //pump off when done
       controlStateIndex = 0; //SYS OFF when done
+      local_controlStateIndex = 0;
     }
   }
 
@@ -163,8 +155,6 @@ void loop() {
 
 // put function definitions here:
 void controlScreen(char key){
-
-  static int local_controlStateIndex = 0;
 
   if(key == 'N' || key == 'B')
   {
