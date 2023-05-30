@@ -1,13 +1,14 @@
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
+#include "ecp.h"
 
 #define RS_MODE_PIN 7
 #define RELAY_PIN 4
 #define LCD_WIDTH 16
 #define LCD_HEIGHT 2
-#define ROWS 5
-#define COLS 1
+#define KEYPAD_ROWS 5
+#define KEYPAD_COLS 1
 
 //function declerations
 void controlScreen(char key);
@@ -16,8 +17,6 @@ void refillWhenScreen(char key);
 void sensorHeightScreen(char key);
 void waterDepthScreen(char key);
 
-String getValueOfKey(String key, String message, String expectType);
-String receiveMessage(char ch);
 void updateLCD(String line1, String line2);
 void setPumpOnOrOff(boolean isOn);
 
@@ -34,10 +33,10 @@ int waterDepth = 200;
 String padding = "";
 
 // //Keypad/////////////////////////////////////////////////////////////////
-char hexaKeys[ROWS][COLS] = {{'N'}, {'B'}, {'I'}, {'D'}, {'S'}};
-byte rowPins[ROWS] = {A0, A1, A2, A3, 6};
-byte colPins[COLS] = {5}; 
-Keypad kpd = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
+char hexaKeys[KEYPAD_ROWS][KEYPAD_COLS] = {{'N'}, {'B'}, {'I'}, {'D'}, {'S'}};
+byte rowPins[KEYPAD_ROWS] = {A0, A1, A2, A3, 6};
+byte colPins[KEYPAD_COLS] = {5}; 
+Keypad kpd = Keypad(makeKeymap(hexaKeys), rowPins, colPins, KEYPAD_ROWS, KEYPAD_COLS);
 // ////////////////////////////////////////////////////////////////////////
 
 typedef void (*Screens)(char key);
@@ -115,15 +114,19 @@ void loop() {
       {
         // int reading = sensorReadingStr.toInt();
         int senReading = sensorReadingStr.toInt();
-        Serial.println("senReading " + String(senReading));
-        float waterReading = waterDepth - (senReading - sensorHeight );
-        Serial.println("waterReading " + String(waterReading));
-        int newWaterLevel = (waterReading / waterDepth) * 100;
-        Serial.println("newWaterLevel " + String(newWaterLevel));
-        Serial.println("");
-        if(newWaterLevel != waterLevel)
+        float senReading_heightAdjusted = waterDepth - (senReading - sensorHeight );
+        int calculatedWaterLevel = (senReading_heightAdjusted / waterDepth) * 100;
+
+        if(calculatedWaterLevel != waterLevel)
         {
-          waterLevel = newWaterLevel;
+          if(calculatedWaterLevel > waterLevel)
+          {
+            waterLevel++;
+          }
+          else
+          {
+             waterLevel--;
+          }
           if(screenIndex == 0)
           {
             screens[screenIndex]('z');
@@ -352,132 +355,6 @@ void waterDepthScreen(char key)
   }
 
   updateLCD("Water Depth", line2);
-}
-
-String receiveMessage(char ch)
-{
-  static int hashes = 0;
-  static int dollars = 0;
-  static String message = "";
-
-  if(!(ch == 10 || ch == 13))
-  {
-    if(ch == '#')
-    {
-      hashes++;
-      if(hashes > 3)
-      {
-        Serial.println("ERR 1"); //more than 3 hashes encountered
-        hashes = 0;
-        dollars = 0;
-        message = "";
-      }   
-    }
-    else 
-    {
-      if(hashes == 3)
-      {
-        if(ch == '$')
-        {
-          dollars++;
-          if(dollars == 3)
-          {
-            const String tempMessage = message;
-            hashes = 0;
-            dollars = 0;
-            message = "";
-            return tempMessage;
-          }
-        }
-        else
-        {
-          if((ch < 59 && ch > 47) || (ch < 91 && ch > 64) || ch == 46 || ch == 33)
-          {
-            if(message.length() < 50)
-            {
-              message += ch;
-            }
-            else
-            {
-              message = "";
-              return "";
-            }
-          }
-          else
-          {
-            const int charCode = ch;
-            Serial.println("ERR un ex body ch: " + String(charCode)); //unexpected character: 
-            hashes = 0;
-            dollars = 0;
-            message = "";
-          }
-        }
-      }
-      else
-      {
-        const int charCode = ch;
-        Serial.println("ERR un ex start ch: " + String(charCode)); //unexpected start char: 
-        hashes = 0;
-        dollars = 0;
-        message = "";
-      }
-    }
-  }
-
-  return "";
-}
-
-String getValueOfKey(String key, String message, String expectType)
-{
-  unsigned int index = message.indexOf(key + ':');
-  String value = "";
-
-  if(index >= 0)
-  {
-    index += 1 + key.length(); // add 1 to remove ':'
-    while (message[index] != '!' && index < message.length())
-    {
-      auto ch = message[index];
-      if(expectType == "num")
-      {
-        if(ch > 47 && ch < 58)
-        {
-          value += ch;
-          index++;
-        }
-        else
-        {
-          return "";
-        }
-      }
-      else
-      {
-        if(ch > 64 && ch < 91)
-        {
-          value += ch;
-          index++;
-        }
-        else
-        {
-          return "";
-        }
-      }
-
-    }
-
-    if(index >= message.length())
-    {
-      return "";
-    }
-    else
-    {
-      return value;
-    }
-  }
-  else
-  {
-    return "";
-  }
 }
 
 void updateLCD(String line1, String line2)
