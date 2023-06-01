@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 #include "ecp.h"
@@ -20,16 +21,26 @@ void waterDepthScreen(char key);
 void updateLCD(String line1, String line2);
 void setPumpOnOrOff(boolean isOn);
 
+int getStopFillWhen();
+int getRefillWhen();
+int getSensorHeight();
+int getWaterDepth();
+
+void setStopFillWhen(int value);
+void setRefillWhen(int value);
+void setSensorHeight(int value);
+void setWaterDepth(int value);
+
 int screenIndex = 0;
 int waterLevel = 0;
 bool pumpOn = false;
 String controlStates[] = {"OFF", "AUTO", "FILL & AUTO", "FILL & OFF"};
 int controlStateIndex = 0; // 0 = OFF, 1 = AUTO, 2 = FILL & AUTO, 3 = FILL & OFF 
 int local_controlStateIndex = controlStateIndex;
-int stopFillWhen = 80;
-int refillWhen = 20;
-int sensorHeight = 20;
-int waterDepth = 200;
+// int stopFillWhen = 80;
+// int refillWhen = 20;
+// int sensorHeight = 20;
+// int waterDepth = 200;
 String padding = "";
 
 // //Keypad/////////////////////////////////////////////////////////////////
@@ -47,6 +58,17 @@ Screens screens[] = {
 LiquidCrystal_I2C lcd(0x27, LCD_WIDTH, LCD_HEIGHT);
 
 void setup() {
+
+  // int stopFillWhen = 80;
+  // int refillWhen = 20;
+  // int sensorHeight = 20;
+  // int waterDepth = 200;
+
+  // setStopFillWhen(80);
+  // setRefillWhen(20);
+  // setSensorHeight(20);
+  // setWaterDepth(200);
+
   lcd.init();
   lcd.clear();
   lcd.backlight();
@@ -73,18 +95,18 @@ void loop() {
 
   if(controlStateIndex == 1)// 0 = OFF, 1 = AUTO, 2 = FILL & AUTO, 3 = FILL & OFF 
   {
-    if(waterLevel >= stopFillWhen && pumpOn == true)
+    if(waterLevel >= getStopFillWhen() && pumpOn == true)
     {
       setPumpOnOrOff(false);
     }
-    else if(waterLevel <= refillWhen && pumpOn == false)
+    else if(waterLevel <= getRefillWhen() && pumpOn == false)
     {
       setPumpOnOrOff(true);
     }
   }
   else if(controlStateIndex == 2) // FILL & AUTO
   {
-    if(waterLevel >= stopFillWhen && pumpOn == true)
+    if(waterLevel >= getStopFillWhen() && pumpOn == true)
     {
       setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 1; //SYS AUTO when done
@@ -93,7 +115,7 @@ void loop() {
   }
   else if(controlStateIndex == 3) // FILL & OFF
   {
-    if(waterLevel >= stopFillWhen && pumpOn == true)
+    if(waterLevel >= getStopFillWhen() && pumpOn == true)
     {
       setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 0; //SYS OFF when done
@@ -114,8 +136,8 @@ void loop() {
       {
         // int reading = sensorReadingStr.toInt();
         int senReading = sensorReadingStr.toInt();
-        float senReading_heightAdjusted = waterDepth - (senReading - sensorHeight );
-        int calculatedWaterLevel = (senReading_heightAdjusted / waterDepth) * 100;
+        float senReading_heightAdjusted = getWaterDepth() - (senReading - getSensorHeight() );
+        int calculatedWaterLevel = (senReading_heightAdjusted / getWaterDepth()) * 100;
 
         if(calculatedWaterLevel != waterLevel)
         {
@@ -191,11 +213,11 @@ void controlScreen(char key){
     {
       setPumpOnOrOff(false);
     } 
-    else if(controlStateIndex == 1 && waterLevel <= refillWhen) //AUTO
+    else if(controlStateIndex == 1 && waterLevel <= getRefillWhen()) //AUTO
     {
       setPumpOnOrOff(true);
     } 
-    else if((controlStateIndex == 2 || controlStateIndex == 3) && waterLevel < stopFillWhen)
+    else if((controlStateIndex == 2 || controlStateIndex == 3) && waterLevel < getStopFillWhen())
     {
       setPumpOnOrOff(true);
     }
@@ -226,23 +248,23 @@ void stopFillWhenScreen(char key)
 
   if(key == 'N' || key == 'B')
   {
-    local_stopFillWhen = stopFillWhen;
+    local_stopFillWhen = getStopFillWhen();
   }
   else if(key == 'I' && local_stopFillWhen + 5 <= 100 )
   {
     local_stopFillWhen += 5;
   }
-  else if(key == 'D' && refillWhen < local_stopFillWhen - 5)
+  else if(key == 'D' && getRefillWhen() < local_stopFillWhen - 5)
   {
     local_stopFillWhen -= 5;
   }
   else if(key == 'S')
   {
-    stopFillWhen = local_stopFillWhen;
+    setStopFillWhen(local_stopFillWhen);
   }
 
   String line2 = "";
-  if(local_stopFillWhen != stopFillWhen)
+  if(local_stopFillWhen != getStopFillWhen())
   {
     line2 = "Set: " + String(local_stopFillWhen) + "%";
   } 
@@ -260,9 +282,9 @@ void refillWhenScreen(char key)
 
   if(key == 'N' || key == 'B')
   {
-    local_refillWhen = refillWhen;
+    local_refillWhen = getRefillWhen();
   }
-  else if(key == 'I' && local_refillWhen + 5 < stopFillWhen )
+  else if(key == 'I' && local_refillWhen + 5 < getStopFillWhen() )
   {
     local_refillWhen += 5;
   }
@@ -272,12 +294,12 @@ void refillWhenScreen(char key)
   }
   else if(key == 'S')
   {
-    refillWhen = local_refillWhen;
+    setRefillWhen(local_refillWhen);
   }
 
 
   String line2 = "";
-  if(local_refillWhen != refillWhen)
+  if(local_refillWhen != getRefillWhen())
   {
     line2 = "Set: " + String(local_refillWhen) + "%";
   } 
@@ -295,9 +317,9 @@ void sensorHeightScreen(char key)
 
   if(key == 'N' || key == 'B')
   {
-    local_sensorHeight = sensorHeight;
+    local_sensorHeight = getSensorHeight();
   }
-  else if(key == 'I' && (local_sensorHeight + 5 + waterDepth <= 600) )
+  else if(key == 'I' && (local_sensorHeight + 5 + getWaterDepth() <= 600) )
   {
     local_sensorHeight += 5;
   }
@@ -307,11 +329,11 @@ void sensorHeightScreen(char key)
   }
   else if(key == 'S')
   {
-    sensorHeight = local_sensorHeight;
+    setSensorHeight(local_sensorHeight);
   }
 
   String line2 = "";
-  if(local_sensorHeight != sensorHeight)
+  if(local_sensorHeight != getSensorHeight())
   {
     line2 = "Set: " + String(local_sensorHeight) + "cm";
   } 
@@ -329,23 +351,23 @@ void waterDepthScreen(char key)
 
   if(key == 'N' || key == 'B')
   {
-    local_waterDepth = waterDepth;
+    local_waterDepth = getWaterDepth();
   }
-  else if(key == 'I' && local_waterDepth + 5 + sensorHeight <= 600)
+  else if(key == 'I' && local_waterDepth + 5 + getSensorHeight() <= 600)
   {
     local_waterDepth += 5;
   }
-  else if(key == 'D' && waterDepth - 5 >= 10)
+  else if(key == 'D' && getWaterDepth() - 5 >= 10)
   {
     local_waterDepth -= 5;
   }
   else if(key == 'S')
   {
-    waterDepth = local_waterDepth;
+    setWaterDepth(local_waterDepth);
   }
 
   String line2 = "";
-  if(local_waterDepth != waterDepth)
+  if(local_waterDepth != getWaterDepth())
   {
     line2 = "Set: " + String(local_waterDepth) + "cm";
   } 
@@ -376,4 +398,51 @@ void setPumpOnOrOff(boolean isOn){
     digitalWrite(RELAY_PIN, LOW);
     pumpOn = isOn;
   }
+}
+
+//Get values from EERPOM
+
+int getStopFillWhen()
+{
+  int stopFillWhen = EEPROM.read(0);
+  return stopFillWhen;
+}
+
+int getRefillWhen(){
+  int refillWhen = EEPROM.read(1);
+  return refillWhen;
+}
+
+int getSensorHeight()
+{
+  int sensorHeight = EEPROM.read(2);
+  return sensorHeight * 5;
+}
+
+int getWaterDepth()
+{
+  int waterDepth = EEPROM.read(3);
+  return waterDepth * 5;
+}
+
+//Set values in EEPROM
+
+void setStopFillWhen(int value)
+{
+  EEPROM.write(0, value);
+}
+
+void setRefillWhen(int value)
+{
+  EEPROM.write(1, value);
+}
+
+void setSensorHeight(int value)
+{
+  EEPROM.write(2, value / 5);
+}
+
+void setWaterDepth(int value)
+{
+  EEPROM.write(3, value / 5);
 }
