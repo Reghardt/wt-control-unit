@@ -18,6 +18,8 @@ void refillWhenScreen(char key);
 void sensorHeightScreen(char key);
 void waterDepthScreen(char key);
 
+void refreshControlScreen();
+
 void updateLCD(String line1, String line2);
 void setPumpOnOrOff(boolean isOn);
 
@@ -98,10 +100,12 @@ void loop() {
     if(waterLevel >= getStopFillWhen() && pumpOn == true)
     {
       setPumpOnOrOff(false);
+      refreshControlScreen();
     }
     else if(waterLevel <= getRefillWhen() && pumpOn == false)
     {
       setPumpOnOrOff(true);
+      refreshControlScreen();
     }
   }
   else if(controlStateIndex == 2) // FILL & AUTO
@@ -111,6 +115,7 @@ void loop() {
       setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 1; //SYS AUTO when done
       local_controlStateIndex = 1;
+      refreshControlScreen();
     }
   }
   else if(controlStateIndex == 3) // FILL & OFF
@@ -120,6 +125,7 @@ void loop() {
       setPumpOnOrOff(false); //pump off when done
       controlStateIndex = 0; //SYS OFF when done
       local_controlStateIndex = 0;
+      refreshControlScreen();
     }
   }
 
@@ -139,21 +145,28 @@ void loop() {
         float senReading_heightAdjusted = getWaterDepth() - (senReading - getSensorHeight() );
         int calculatedWaterLevel = (senReading_heightAdjusted / getWaterDepth()) * 100;
 
-        if(calculatedWaterLevel != waterLevel)
+        Serial.println("senR: " + String(senReading) + " c wl: " + String(calculatedWaterLevel) + " wl:" + String(waterLevel));
+        if(waterLevel == 0)
         {
-          if(calculatedWaterLevel > waterLevel)
+          waterLevel = calculatedWaterLevel;
+        }
+        else
+        {
+          if(calculatedWaterLevel != waterLevel)
           {
-            waterLevel++;
-          }
-          else
-          {
-             waterLevel--;
-          }
-          if(screenIndex == 0)
-          {
-            screens[screenIndex]('z');
+            if(calculatedWaterLevel > waterLevel)
+            {
+              waterLevel++;
+            }
+            else
+            {
+              waterLevel--;
+            }
+            refreshControlScreen();
           }
         }
+        
+
       }
     }
   }
@@ -217,9 +230,31 @@ void controlScreen(char key){
     {
       setPumpOnOrOff(true);
     } 
-    else if((controlStateIndex == 2 || controlStateIndex == 3) && waterLevel < getStopFillWhen())
+    else if(controlStateIndex == 2) //FILL & AUTO
     {
-      setPumpOnOrOff(true);
+      if(waterLevel < getStopFillWhen()) //if FILL & AUTO and WL under stop fill when
+      {
+        setPumpOnOrOff(true); //fill
+      }
+      else //tank already over or at max level so set as AUTO and turn off pump
+      {
+        setPumpOnOrOff(false);
+        controlStateIndex = 1; //Set AUTO
+        local_controlStateIndex = 1;
+      }
+    }
+    else if(controlStateIndex == 3) //FILL & OFF
+    {
+      if(waterLevel < getStopFillWhen())
+      {
+        setPumpOnOrOff(true);
+      }
+      else //tank already over max level so set as off and turn pump off
+      {
+        setPumpOnOrOff(false);
+        controlStateIndex = 0; //Set OFF
+        local_controlStateIndex = 0;
+      }
     }
   }
 
@@ -377,6 +412,14 @@ void waterDepthScreen(char key)
   }
 
   updateLCD("Water Depth", line2);
+}
+
+void refreshControlScreen()
+{
+  if(screenIndex == 0)
+  {
+    screens[0]('z');
+  }
 }
 
 void updateLCD(String line1, String line2)
