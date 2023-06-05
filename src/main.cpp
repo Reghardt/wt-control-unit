@@ -149,6 +149,7 @@ void loop() {
         if(waterLevel == 0)
         {
           waterLevel = calculatedWaterLevel;
+          refreshControlScreen();
         }
         else
         {
