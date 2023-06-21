@@ -434,12 +434,12 @@ void updateLCD(String line1, String line2)
 void setPumpOnOrOff(boolean isOn){
   if(isOn)
   {
-    digitalWrite(RELAY_PIN, HIGH);
+    digitalWrite(RELAY_PIN, LOW); //Low level trigger
     pumpOn = isOn;
   }
   else
   {
-    digitalWrite(RELAY_PIN, LOW);
+    digitalWrite(RELAY_PIN, HIGH);
     pumpOn = isOn;
   }
 }
